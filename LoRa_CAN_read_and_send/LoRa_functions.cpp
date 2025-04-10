@@ -69,4 +69,5 @@ void sendLoRaData() {
     LoRa.print(MPPT_total_watt);
 
     LoRa.endPacket();
+    Serial.println("CAN sent with LoRa.");
 }
