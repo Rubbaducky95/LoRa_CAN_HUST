@@ -1,2 +1,2 @@
-# LoRa_CAN_HUST
-Reading CAN and sending and receiving with LoRa while saving on SD card on a ESP32S3
+# LoRa-send-and-CAN-read
+Reads CAN bus, translates and sends with LoRa, and saves to an SD card on an ESP32S3
