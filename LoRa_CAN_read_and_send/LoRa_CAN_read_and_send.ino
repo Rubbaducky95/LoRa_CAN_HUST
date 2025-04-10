@@ -41,7 +41,13 @@ void prepareAndWrite2SD() {
             battery_cell_ID_HIGH_temp, battery_cell_ID_LOW_temp, BMS_temp,
             motor_current, motor_temp, motor_controller_temp,
             MPPT1_watt, MPPT2_watt, MPPT3_watt, MPPT_total_watt);
-  write2SDcard(buffer, SDcardFlag);
+  
+  digitalWrite(SS, HIGH);           // Deselect LoRa
+  digitalWrite(CS, LOW);            // Select SD card
+  write2SDcard(buffer, SDcardFlag); // Write file to SD card
+  if(SDcardFlag) SDcardFlag = 0;    // Set flag to 0 after first iteration to write on the same file
+  digitalWrite(CS, HIGH);           // Deselect SD card
+  digitalWrite(SS, LOW);            // Select LoRa
 }
 
 void blinkLEDs() {
@@ -83,11 +89,27 @@ void setup() {
 
   setupCAN();
 
+  Serial.println("Pin Configuration:");
+  Serial.print("SS: "); Serial.println(SS);
+  Serial.print("RST: "); Serial.println(RST);
+  Serial.print("DIO0: "); Serial.println(DIO0);
+  Serial.print("SCK: "); Serial.println(SCK);
+  Serial.print("MISO: "); Serial.println(MISO);
+  Serial.print("MOSI: "); Serial.println(MOSI);
+  Serial.print("CS: "); Serial.println(CS);
+
   // Initialize SD
   if(!SD.begin(CS, spiLoRa)) {
     Serial.println("SD Card Mount Failed");
   } else {
-    Serial.println("SD Card Initialized");
+    Serial.println("SD Card Mount Succesful");
+  }
+
+  // Initialize NVS
+  if (initNVS()) {
+    Serial.println("NVS Initialized");
+  } else {
+    Serial.println("NVS Initialization Failed");
   }
 
   // Blinkers setup
@@ -102,9 +124,9 @@ void setup() {
 void loop() {
 
   static clock_t lastSendTime = 0;
-
   if (ESP32Can.readFrame(msg, 0)) {
-    Serial.printf("Received CAN ID: %3X \r\n", msg.identifier);
+    Serial.print("+");
+    //Serial.printf("Received CAN ID: %3X \r\n", msg.identifier);
 
     // Assign CAN data to specified variable based on identifier
     assignCAN2variable();
@@ -116,6 +138,8 @@ void loop() {
     double timeElapsed = ((double)(currentTime - lastSendTime))/CLOCKS_PER_SEC;
 
     if (timeElapsed >= sendInterval) {
+
+      Serial.println();
 
       /* //Print information form driver
       if(driver_current > 0.0 || driverRPM > 0.0) {
@@ -129,15 +153,10 @@ void loop() {
 
       // Prepare const char of our variables and save to SD card
       prepareAndWrite2SD();
-      digitalWrite(SS, LOW);
-      digitalWrite(CS, HIGH);
-      Serial.println("Wrote to SD");
-      digitalWrite(SS, HIGH);
-      digitalWrite(CS, LOW);
 
       // Send with LoRa
       sendLoRaData();
-      Serial.println("CAN sent with LoRa");
+
       lastSendTime = currentTime;
     }
   }
