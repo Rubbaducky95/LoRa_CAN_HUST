@@ -1,10 +1,3 @@
-/*********
-  Rui Santos & Sara Santos - Random Nerd Tutorials
-  Modified from the examples of the Arduino LoRa library
-  More resources: https://RandomNerdTutorials.com/
-esp32-lora-rfm95-transceiver-arduino-ide/
-*********/
-
 #include <Arduino.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,15 +7,27 @@ esp32-lora-rfm95-transceiver-arduino-ide/
 #include "SD_card.h"
 #include "CAN_functions.h"
 #include "LoRa_functions.h"
+#include "LED_functions.h"
 
 // Flag for writing in same folder on the SD-card
 int SDcardFlag = 1;
 
-// Variables for blinking LEDs
-int count = 0;
-unsigned long previousMillisLEDs = 0;
-const int blinkInterval = 500;
-bool ledState = LOW;
+void setupSD() {
+
+  // Initialize SD
+  if(!SD.begin(CS, spiLoRa)) {
+    Serial.println("SD Card Mount Failed");
+  } else {
+    Serial.println("SD Card Mount Succesful");
+  }
+
+  // Initialize NVS
+  if (initNVS()) {
+    Serial.println("NVS Initialized");
+  } else {
+    Serial.println("NVS Initialization Failed");
+  }
+}
 
 void prepareAndWrite2SD() {
   char buffer[512];
@@ -50,36 +55,9 @@ void prepareAndWrite2SD() {
   digitalWrite(SS, LOW);            // Select LoRa
 }
 
-void blinkLEDs() {
-
-  unsigned long currentMillis = millis();
-
-  if(currentMillis - previousMillisLEDs >= blinkInterval) {
-    previousMillisLEDs = currentMillis;
-    ledState = !ledState;
-
-    // Blink LEDS
-    if (left_blinker > 0.0 || hazard_light > 0.0) {
-    digitalWrite(15, ledState);
-    }
-    else
-      digitalWrite(15, LOW);
-    
-    if (right_blinker > 0.0 || hazard_light > 0.0) {
-      digitalWrite(16, ledState);
-    }
-    else
-      digitalWrite(16, LOW);
-    
-    if (brake_light > 0.0) {
-      digitalWrite(7, HIGH);
-    }
-    else
-      digitalWrite(7, LOW);
-  }
-}
-
 void setup() {
+
+  delay(3000);
 
   //initialize Serial Monitor
   Serial.begin(115200);
@@ -89,42 +67,16 @@ void setup() {
 
   setupCAN();
 
-  Serial.println("Pin Configuration:");
-  Serial.print("SS: "); Serial.println(SS);
-  Serial.print("RST: "); Serial.println(RST);
-  Serial.print("DIO0: "); Serial.println(DIO0);
-  Serial.print("SCK: "); Serial.println(SCK);
-  Serial.print("MISO: "); Serial.println(MISO);
-  Serial.print("MOSI: "); Serial.println(MOSI);
-  Serial.print("CS: "); Serial.println(CS);
+  setupLEDs();
 
-  // Initialize SD
-  if(!SD.begin(CS, spiLoRa)) {
-    Serial.println("SD Card Mount Failed");
-  } else {
-    Serial.println("SD Card Mount Succesful");
-  }
-
-  // Initialize NVS
-  if (initNVS()) {
-    Serial.println("NVS Initialized");
-  } else {
-    Serial.println("NVS Initialization Failed");
-  }
-
-  // Blinkers setup
-  pinMode(15, OUTPUT);
-  digitalWrite(15, LOW);
-  pinMode(16, OUTPUT);
-  digitalWrite(16, LOW);
-  pinMode(7, OUTPUT);
-  digitalWrite(7, LOW);
+  setupSD();
 }
 
 void loop() {
 
   static clock_t lastSendTime = 0;
   if (ESP32Can.readFrame(msg, 0)) {
+
     Serial.print("+");
     //Serial.printf("Received CAN ID: %3X \r\n", msg.identifier);
 
@@ -132,7 +84,7 @@ void loop() {
     assignCAN2variable();
 
     //Blink LEDs
-    blinkLEDs();
+    //blinkLEDs();
 
     clock_t currentTime = clock();
     double timeElapsed = ((double)(currentTime - lastSendTime))/CLOCKS_PER_SEC;
@@ -141,43 +93,42 @@ void loop() {
 
       Serial.println();
 
-      /* //Print information form driver
-      if(driver_current > 0.0 || driverRPM > 0.0) {
-        Serial.printf("Driver current: %.2f, Driver RPM: %.2f", driver_current, driverRPM);
-        Serial.println();
-      }
-      if(left_blinker > 0 || right_blinker > 0 || hazard_light > 0 || brake_light > 0) {
-        Serial.printf("left: %d, right %d, hazard: %d, brake: %d", left_blinker, right_blinker, hazard_light, brake_light);
-        Serial.println();
-      } */
+      // Send brake condition to steering wheel
+      sendCAN2steeringWheel(brake_light || digitalRead(READ_BRAKE_LIGHT));
 
-      // Prepare const char of our variables and save to SD card
-      prepareAndWrite2SD();
+      // Blink lights if necessary
+      blinkLEDs();
 
       // Send with LoRa
       sendLoRaData();
+
+      // Prepare const char of our variables and save to SD card
+      prepareAndWrite2SD();
 
       lastSendTime = currentTime;
     }
   }
 
   // Check for incoming parameters from receiver
-  /* int packetSize = LoRa.parsePacket();
+  /*
+  int packetSize = LoRa.parsePacket();
   if (packetSize) {
-    String receivedParams = "";
+    char receivedParams[packetSize + 1];
+    int index = 0;
     while (LoRa.available()) {
-      receivedParams += (char)LoRa.read();
+      receivedParams[index++] = (char)LoRa.read();
     }
-    if (receivedParams.startsWith("PARAM")) {
-      int sfIndex = receivedParams.indexOf(' ', 6);
-      int sbwIndex = receivedParams.indexOf(' ', sfIndex + 1);
-      sf = receivedParams.substring(6, sfIndex).toInt();
-      sbw = receivedParams.substring(sfIndex + 1, sbwIndex).toInt();
+    receivedParams[index] = '\0';
+
+    if (strncmp(receivedParams, "PARAM", 5) == 0) {
+      int sf = 0, sbw = 0;
+      sscanf(receivedParams, "PARAM %d %d", &sf, &sbw);
 
       LoRa.setSpreadingFactor(sf);
       LoRa.setSignalBandwidth(sbw);
 
       Serial.printf("Updated SF: %d, SBW: %ld\n", sf, sbw);
     }
-  } */
+  }
+  */
 }
