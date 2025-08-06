@@ -13,7 +13,7 @@
 // Define pins for miso mosi and clock
 #define SCK 13
 #define MISO 12
-#define MOSI11
+#define MOSI 11
 
 extern SPIClass spiLoRa;
 
