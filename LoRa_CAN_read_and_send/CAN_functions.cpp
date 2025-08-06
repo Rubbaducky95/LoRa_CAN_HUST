@@ -1,4 +1,5 @@
 #include "CAN_functions.h"
+#include "LED_functions.h"
 
 // Define variables for CAN-data transmission
 float battery_volt;
@@ -26,12 +27,6 @@ float MPPT2_watt;
 float MPPT3_watt;
 float MPPT_total_watt;
 
-int left_blinker;
-int right_blinker;
-int hazard_light;
-int brake_light;
-int horn;
-
 CanFrame msg;
 
 void setupCAN() {
@@ -58,6 +53,28 @@ void setupCAN() {
   } else {
     Serial.println("CAN bus failed!");
   }
+}
+
+void sendCAN2steeringWheel(bool brakeLightCondition) {
+
+    // Send a 0 if brake light is off, and a 1 if it is on
+    int bit;
+    (brakeLightCondition) ? bit = 1 : bit = 0;
+
+    CanFrame obdFrame         = {0};
+    obdFrame.identifier       = 0x175; // Default OBD2 address;
+    obdFrame.extd             = 0;
+    obdFrame.data_length_code = 8;
+    obdFrame.data[0]          = bit;
+    obdFrame.data[1]          = 0xAA;
+    obdFrame.data[2]          = 0xAA;
+    obdFrame.data[3]          = 0xAA; // Best to use 0xAA (0b10101010) instead of 0
+    obdFrame.data[4]          = 0xAA; // CAN works better this way as it needs
+    obdFrame.data[5]          = 0xAA; // to avoid bit-stuffing
+    obdFrame.data[6]          = 0xAA;
+    obdFrame.data[7]          = 0xAA;
+    // Accepts both pointers and references
+    ESP32Can.writeFrame(obdFrame); // timeout defaults to 1 ms
 }
 
 void assignCAN2variable() {
@@ -127,8 +144,7 @@ void assignCAN2variable() {
       right_blinker = msg.data[1];
       hazard_light = msg.data[2];
       brake_light = msg.data[3];
-      Serial.printf("left: %d, right %d, hazard: %d, brake: %d", left_blinker, right_blinker, hazard_light, brake_light);
-      Serial.println();
+      //Serial.printf("left: %d, right %d, hazard: %d, brake: %d\n", left_blinker, right_blinker, hazard_light, brake_light);
 
     case 0x501:
       driver_current = *((float*)(msg.data+4));
