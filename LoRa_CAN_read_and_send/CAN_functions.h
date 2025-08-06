@@ -33,15 +33,10 @@ extern float MPPT2_watt;
 extern float MPPT3_watt;
 extern float MPPT_total_watt;
 
-extern int left_blinker;
-extern int right_blinker;
-extern int hazard_light;
-extern int brake_light;
-extern int horn;
-
 extern CanFrame msg;
 
 void setupCAN();
+void sendCAN2steeringWheel(bool brakeLightCondition);
 void assignCAN2variable();
 
 #endif
