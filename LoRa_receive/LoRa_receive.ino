@@ -10,7 +10,7 @@
 float kalmanGain = 0.1;
 float estimateError = 3.0;
 float measurementError = 3.0;
-float estimatedRSSI = -30.0;
+float estimatedRSSI = -80.0;
 
 float packetRSSI;
 String LoRaData;
