@@ -26,7 +26,8 @@ class BaseSerialReader:
             "MPPT1_watt",
             "MPPT2_watt",
             "MPPT3_watt",
-            "MPPT_total_watt"
+            "MPPT_total_watt",
+            "rssi"
         ]
         # Build a history for each variable (100 samples), initially all zeros.
         self.history = { key: [0.0] * 100 for key in self.available_data }
